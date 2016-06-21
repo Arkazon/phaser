@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2016 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -34,6 +34,24 @@ Phaser.World = function (game) {
     */
     this.camera = null;
 
+    /**
+    * @property {boolean} _definedSize - True if the World has been given a specifically defined size (i.e. from a Tilemap or direct in code) or false if it's just matched to the Game dimensions.
+    * @readonly
+    */
+    this._definedSize = false;
+
+    /**
+    * @property {number} width - The defined width of the World. Sometimes the bounds needs to grow larger than this (if you resize the game) but this retains the original requested dimension.
+    */
+    this._width = game.width;
+
+    /**
+    * @property {number} height - The defined height of the World. Sometimes the bounds needs to grow larger than this (if you resize the game) but this retains the original requested dimension.
+    */
+    this._height = game.height;
+
+    this.game.state.onStateChange.add(this.stateChange, this);
+
 };
 
 Phaser.World.prototype = Object.create(Phaser.Group.prototype);
@@ -49,44 +67,89 @@ Phaser.World.prototype.boot = function () {
 
     this.camera = new Phaser.Camera(this.game, 0, 0, 0, this.game.width, this.game.height);
 
-    this.camera.displayObject = this;
-
-    this.camera.scale = this.scale;
-
-    this.game.camera = this.camera;
-
     this.game.stage.addChild(this);
+
+    this.camera.boot();
+
+};
+
+/**
+* Called whenever the State changes or resets.
+* 
+* It resets the world.x and world.y coordinates back to zero,
+* then resets the Camera.
+*
+* @method Phaser.World#stateChange
+* @protected
+*/
+Phaser.World.prototype.stateChange = function () {
+
+    this.x = 0;
+    this.y = 0;
+
+    this.camera.reset();
+
+};
+
+/**
+* Updates the size of this world and sets World.x/y to the given values
+* The Camera bounds and Physics bounds (if set) are also updated to match the new World bounds.
+*
+* @method Phaser.World#setBounds
+* @param {number} x - Top left most corner of the world.
+* @param {number} y - Top left most corner of the world.
+* @param {number} width - New width of the game world in pixels.
+* @param {number} height - New height of the game world in pixels.
+*/
+Phaser.World.prototype.setBounds = function (x, y, width, height) {
+
+    this._definedSize = true;
+    this._width = width;
+    this._height = height;
+
+    this.bounds.setTo(x, y, width, height);
+
+    this.x = x;
+    this.y = y;
+
+    if (this.camera.bounds)
+    {
+        //  The Camera can never be smaller than the game size
+        this.camera.bounds.setTo(x, y, Math.max(width, this.game.width), Math.max(height, this.game.height));
+    }
+
+    this.game.physics.setBoundsToWorld();
 
 };
 
 /**
 * Updates the size of this world. Note that this doesn't modify the world x/y coordinates, just the width and height.
 *
-* @method Phaser.World#setBounds
-* @param {number} x - Top left most corner of the world.
-* @param {number} y - Top left most corner of the world.
-* @param {number} width - New width of the world. Can never be smaller than the Game.width.
-* @param {number} height - New height of the world. Can never be smaller than the Game.height.
+* @method Phaser.World#resize
+* @param {number} width - New width of the game world in pixels.
+* @param {number} height - New height of the game world in pixels.
 */
-Phaser.World.prototype.setBounds = function (x, y, width, height) {
+Phaser.World.prototype.resize = function (width, height) {
 
-    if (width < this.game.width)
+    //  Don't ever scale the World bounds lower than the original requested dimensions if it's a defined world size
+
+    if (this._definedSize)
     {
-        width = this.game.width;
+        if (width < this._width)
+        {
+            width = this._width;
+        }
+
+        if (height < this._height)
+        {
+            height = this._height;
+        }
     }
 
-    if (height < this.game.height)
-    {
-        height = this.game.height;
-    }
+    this.bounds.width = width;
+    this.bounds.height = height;
 
-    this.bounds.setTo(x, y, width, height);
-
-    if (this.camera.bounds)
-    {
-        //  The Camera can never be smaller than the game size
-        this.camera.bounds.setTo(x, y, width, height);
-    }
+    this.game.camera.setBoundsToWorld();
 
     this.game.physics.setBoundsToWorld();
 
@@ -107,33 +170,41 @@ Phaser.World.prototype.shutdown = function () {
 /**
 * This will take the given game object and check if its x/y coordinates fall outside of the world bounds.
 * If they do it will reposition the object to the opposite side of the world, creating a wrap-around effect.
+* If sprite has a P2 body then the body (sprite.body) should be passed as first parameter to the function.
+*
+* Please understand there are limitations to this method. For example if you have scaled the World
+* then objects won't always be re-positioned correctly, and you'll need to employ your own wrapping function.
 *
 * @method Phaser.World#wrap
 * @param {Phaser.Sprite|Phaser.Image|Phaser.TileSprite|Phaser.Text} sprite - The object you wish to wrap around the world bounds.
 * @param {number} [padding=0] - Extra padding added equally to the sprite.x and y coordinates before checking if within the world bounds. Ignored if useBounds is true.
 * @param {boolean} [useBounds=false] - If useBounds is false wrap checks the object.x/y coordinates. If true it does a more accurate bounds check, which is more expensive.
+* @param {boolean} [horizontal=true] - If horizontal is false, wrap will not wrap the object.x coordinates horizontally.
+* @param {boolean} [vertical=true] - If vertical is false, wrap will not wrap the object.y coordinates vertically.
 */
-Phaser.World.prototype.wrap = function (sprite, padding, useBounds) {
+Phaser.World.prototype.wrap = function (sprite, padding, useBounds, horizontal, vertical) {
 
-    if (typeof padding === 'undefined') { padding = 0; }
-    if (typeof useBounds === 'undefined') { useBounds = false; }
+    if (padding === undefined) { padding = 0; }
+    if (useBounds === undefined) { useBounds = false; }
+    if (horizontal === undefined) { horizontal = true; }
+    if (vertical === undefined) { vertical = true; }
 
     if (!useBounds)
     {
-        if (sprite.x + padding < this.bounds.x)
+        if (horizontal && sprite.x + padding < this.bounds.x)
         {
             sprite.x = this.bounds.right + padding;
         }
-        else if (sprite.x - padding > this.bounds.right)
+        else if (horizontal && sprite.x - padding > this.bounds.right)
         {
             sprite.x = this.bounds.left - padding;
         }
 
-        if (sprite.y + padding < this.bounds.top)
+        if (vertical && sprite.y + padding < this.bounds.top)
         {
             sprite.y = this.bounds.bottom + padding;
         }
-        else if (sprite.y - padding > this.bounds.bottom)
+        else if (vertical && sprite.y - padding > this.bounds.bottom)
         {
             sprite.y = this.bounds.top - padding;
         }
@@ -142,22 +213,28 @@ Phaser.World.prototype.wrap = function (sprite, padding, useBounds) {
     {
         sprite.getBounds();
 
-        if (sprite._currentBounds.right < this.bounds.x)
+        if (horizontal)
         {
-            sprite.x = this.bounds.right;
-        }
-        else if (sprite._currentBounds.x > this.bounds.right)
-        {
-            sprite.x = this.bounds.left;
+            if ((sprite.x + sprite._currentBounds.width) < this.bounds.x)
+            {
+                sprite.x = this.bounds.right;
+            }
+            else if (sprite.x > this.bounds.right)
+            {
+                sprite.x = this.bounds.left;
+            }
         }
 
-        if (sprite._currentBounds.bottom < this.bounds.top)
+        if (vertical)
         {
-            sprite.y = this.bounds.bottom;
-        }
-        else if (sprite._currentBounds.top > this.bounds.bottom)
-        {
-            sprite.y = this.bounds.top;
+            if ((sprite.y + sprite._currentBounds.height) < this.bounds.top)
+            {
+                sprite.y = this.bounds.bottom;
+            }
+            else if (sprite.y > this.bounds.bottom)
+            {
+                sprite.y = this.bounds.top;
+            }
         }
     }
 
@@ -165,7 +242,7 @@ Phaser.World.prototype.wrap = function (sprite, padding, useBounds) {
 
 /**
 * @name Phaser.World#width
-* @property {number} width - Gets or sets the current width of the game world.
+* @property {number} width - Gets or sets the current width of the game world. The world can never be smaller than the game (canvas) dimensions.
 */
 Object.defineProperty(Phaser.World.prototype, "width", {
 
@@ -174,14 +251,23 @@ Object.defineProperty(Phaser.World.prototype, "width", {
     },
 
     set: function (value) {
+
+        if (value < this.game.width)
+        {
+            value = this.game.width;
+        }
+
         this.bounds.width = value;
+        this._width = value;
+        this._definedSize = true;
+
     }
 
 });
 
 /**
 * @name Phaser.World#height
-* @property {number} height - Gets or sets the current height of the game world.
+* @property {number} height - Gets or sets the current height of the game world. The world can never be smaller than the game (canvas) dimensions.
 */
 Object.defineProperty(Phaser.World.prototype, "height", {
 
@@ -190,7 +276,16 @@ Object.defineProperty(Phaser.World.prototype, "height", {
     },
 
     set: function (value) {
+
+        if (value < this.game.height)
+        {
+            value = this.game.height;
+        }
+
         this.bounds.height = value;
+        this._height = value;
+        this._definedSize = true;
+
     }
 
 });
@@ -203,7 +298,7 @@ Object.defineProperty(Phaser.World.prototype, "height", {
 Object.defineProperty(Phaser.World.prototype, "centerX", {
 
     get: function () {
-        return this.bounds.halfWidth;
+        return this.bounds.halfWidth + this.bounds.x;
     }
 
 });
@@ -216,7 +311,7 @@ Object.defineProperty(Phaser.World.prototype, "centerX", {
 Object.defineProperty(Phaser.World.prototype, "centerY", {
 
     get: function () {
-        return this.bounds.halfHeight;
+        return this.bounds.halfHeight + this.bounds.y;
     }
 
 });
@@ -232,11 +327,11 @@ Object.defineProperty(Phaser.World.prototype, "randomX", {
 
         if (this.bounds.x < 0)
         {
-            return this.game.rnd.integerInRange(this.bounds.x, (this.bounds.width - Math.abs(this.bounds.x)));
+            return this.game.rnd.between(this.bounds.x, (this.bounds.width - Math.abs(this.bounds.x)));
         }
         else
         {
-            return this.game.rnd.integerInRange(this.bounds.x, this.bounds.width);
+            return this.game.rnd.between(this.bounds.x, this.bounds.width);
         }
 
     }
@@ -254,11 +349,11 @@ Object.defineProperty(Phaser.World.prototype, "randomY", {
 
         if (this.bounds.y < 0)
         {
-            return this.game.rnd.integerInRange(this.bounds.y, (this.bounds.height - Math.abs(this.bounds.y)));
+            return this.game.rnd.between(this.bounds.y, (this.bounds.height - Math.abs(this.bounds.y)));
         }
         else
         {
-            return this.game.rnd.integerInRange(this.bounds.y, this.bounds.height);
+            return this.game.rnd.between(this.bounds.y, this.bounds.height);
         }
 
     }

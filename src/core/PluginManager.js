@@ -2,7 +2,7 @@
 
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2016 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -10,7 +10,6 @@
 * The Plugin Manager is responsible for the loading, running and unloading of Phaser Plugins.
 *
 * @class Phaser.PluginManager
-* @classdesc Phaser - PluginManager
 * @constructor
 * @param {Phaser.Game} game - A reference to the currently running game.
 */
@@ -22,7 +21,7 @@ Phaser.PluginManager = function(game) {
     this.game = game;
 
     /**
-    * @property {array} plugins - An array of all the plugins being managed by this PluginManager.
+    * @property {Phaser.Plugin[]} plugins - An array of all the plugins being managed by this PluginManager.
     */
     this.plugins = [];
 
@@ -44,16 +43,16 @@ Phaser.PluginManager.prototype = {
 
     /**
     * Add a new Plugin into the PluginManager.
-    * The Plugin must have 2 properties: game and parent. Plugin.game is set to ths game reference the PluginManager uses, and parent is set to the PluginManager.
+    * The Plugin must have 2 properties: game and parent. Plugin.game is set to the game reference the PluginManager uses, and parent is set to the PluginManager.
     *
     * @method Phaser.PluginManager#add
     * @param {object|Phaser.Plugin} plugin - The Plugin to add into the PluginManager. This can be a function or an existing object.
-    * @param {...*} parameter - Additional parameters that will be passed to the Plugin.init method.
+    * @param {...*} parameter - Additional arguments that will be passed to the Plugin.init method.
     * @return {Phaser.Plugin} The Plugin that was added to the manager.
     */
     add: function (plugin) {
 
-        var args = Array.prototype.splice.call(arguments, 1);
+        var args = Array.prototype.slice.call(arguments, 1);
         var result = false;
 
         //  Prototype?
@@ -132,8 +131,11 @@ Phaser.PluginManager.prototype = {
     *
     * @method Phaser.PluginManager#remove
     * @param {Phaser.Plugin} plugin - The plugin to be removed.
+    * @param {boolean} [destroy=true] - Call destroy on the plugin that is removed?
     */
-    remove: function (plugin) {
+    remove: function (plugin, destroy) {
+
+        if (destroy === undefined) { destroy = true; }
 
         this._i = this._len;
 
@@ -141,7 +143,11 @@ Phaser.PluginManager.prototype = {
         {
             if (this.plugins[this._i] === plugin)
             {
-                plugin.destroy();
+                if (destroy)
+                {
+                    plugin.destroy();
+                }
+
                 this.plugins.splice(this._i, 1);
                 this._len--;
                 return;

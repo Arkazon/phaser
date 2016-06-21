@@ -1,6 +1,6 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2016 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
@@ -11,13 +11,17 @@
 * @class Phaser.State
 * @constructor
 */
-
 Phaser.State = function () {
 
     /**
     * @property {Phaser.Game} game - This is a reference to the currently running Game.
     */
     this.game = null;
+
+    /**
+    * @property {string} key - The string based identifier given to the State when added into the State Manager.
+    */
+    this.key = '';
 
     /**
     * @property {Phaser.GameObjectFactory} add - A reference to the GameObjectFactory which can be used to add new objects to the World.
@@ -70,6 +74,11 @@ Phaser.State = function () {
     this.stage = null;
 
     /**
+    * @property {Phaser.StateManager} stage - A reference to the State Manager, which controls state changes.
+    */
+    this.state = null;
+
+    /**
     * @property {Phaser.Time} time - A reference to the game clock and timed events system.
     */
     this.time = null;
@@ -102,6 +111,16 @@ Phaser.State = function () {
 };
 
 Phaser.State.prototype = {
+
+    /**
+    * init is the very first function called when your State starts up. It's called before preload, create or anything else.
+    * If you need to route the game away to another State you could do so here, or if you need to prepare a set of variables
+    * or objects before the preloading starts.
+    *
+    * @method Phaser.State#init
+    */
+    init: function () {
+    },
 
     /**
     * preload is called first. Normally you'd use this to load your game assets (or those needed for the current State)
@@ -142,11 +161,19 @@ Phaser.State.prototype = {
     /**
     * The update method is left empty for your own use.
     * It is called during the core game loop AFTER debug, physics, plugins and the Stage have had their preUpdate methods called.
-    * If is called BEFORE Stage, Tweens, Sounds, Input, Physics, Particles and Plugins have had their postUpdate methods called.
+    * It is called BEFORE Stage, Tweens, Sounds, Input, Physics, Particles and Plugins have had their postUpdate methods called.
     *
     * @method Phaser.State#update
     */
     update: function () {
+    },
+
+    /**
+    * The preRender method is called after all Game Objects have been updated, but before any rendering takes place.
+    *
+    * @method Phaser.State#preRender
+    */
+    preRender: function () {
     },
 
     /**
@@ -160,11 +187,27 @@ Phaser.State.prototype = {
     },
 
     /**
+    * If your game is set to Scalemode RESIZE then each time the browser resizes it will call this function, passing in the new width and height.
+    *
+    * @method Phaser.State#resize
+    */
+    resize: function () {
+    },
+
+    /**
     * This method will be called if the core game loop is paused.
     *
     * @method Phaser.State#paused
     */
     paused: function () {
+    },
+
+    /**
+    * This method will be called when the core game loop resumes from a paused state.
+    *
+    * @method Phaser.State#resumed
+    */
+    resumed: function () {
     },
 
     /**

@@ -1,14 +1,13 @@
 /**
 * @author       Richard Davey <rich@photonstorm.com>
-* @copyright    2014 Photon Storm Ltd.
+* @copyright    2016 Photon Storm Ltd.
 * @license      {@link https://github.com/photonstorm/phaser/blob/master/license.txt|MIT License}
 */
 
 /**
+* Create a new `Particle` object. Particles are extended Sprites that are emitted by a particle emitter such as Phaser.Particles.Arcade.Emitter.
+* 
 * @class Phaser.Particle
-*
-* @classdesc Create a new `Particle` object. Particles are extended Sprites that are emitted by a particle emitter such as Phaser.Particles.Arcade.Emitter.
-*
 * @constructor
 * @extends Phaser.Sprite
 * @param {Phaser.Game} game - A reference to the currently running game.
@@ -149,29 +148,11 @@ Phaser.Particle.prototype.setScaleData = function(data) {
 * @param {number} x - The x coordinate (in world space) to position the Particle at.
 * @param {number} y - The y coordinate (in world space) to position the Particle at.
 * @param {number} [health=1] - The health to give the Particle.
-* @return (Phaser.Particle) This instance.
+* @return {Phaser.Particle} This instance.
 */
 Phaser.Particle.prototype.reset = function(x, y, health) {
 
-    if (typeof health === 'undefined') { health = 1; }
-
-    this.world.setTo(x, y);
-    this.position.x = x;
-    this.position.y = y;
-    this.alive = true;
-    this.exists = true;
-    this.visible = true;
-    this.renderable = true;
-    this._outOfBoundsFired = false;
-
-    this.health = health;
-
-    if (this.body)
-    {
-        this.body.reset(x, y, false, false);
-    }
-
-    this._cache[4] = 1;
+    Phaser.Component.Reset.prototype.reset.call(this, x, y, health);
 
     this.alpha = 1;
     this.scale.set(1);
